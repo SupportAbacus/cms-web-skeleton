@@ -1,0 +1,15 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Deploy via the Mac-mini Jenkins webhook (static IP, whitelisted on the
+      # VPS). GitHub Actions' Azure runners cannot SSH directly to the VPS
+      # (port block + key auth), so we hand off to Jenkins which does the
+      # git reset --hard + docker compose up -d --build on the VPS.
+      - name: Trigger Jenkins deploy (Mac mini -> Hostinger VPS)
+        run: |
+          curl -fsS -X POST "https://website-jenkins.abacusdesk.co.in/generic-webhook-trigger/invoke?token=${{ secrets.JENKINS_WEBHOOK_TOKEN }}" -H "Content-Type: application/json" -d '{"domain": "webcms.abacusdesk.co.in"}'

@@ -18,6 +18,17 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# NEXT_PUBLIC_* is inlined into the client bundle by `next build`, so these must
+# be BUILD args. Supplying them only as runtime `environment:` entries leaves the
+# compiled JS holding the fallback values (NEXT_PUBLIC_SITE_KEY is read in 16
+# places, so a wrong value here silently serves the wrong tenant's content).
+ARG NEXT_PUBLIC_SITE_KEY
+ARG NEXT_PUBLIC_SITE_DOMAIN
+ARG NEXT_PUBLIC_PREVIEW_BASE
+ENV NEXT_PUBLIC_SITE_KEY=${NEXT_PUBLIC_SITE_KEY}
+ENV NEXT_PUBLIC_SITE_DOMAIN=${NEXT_PUBLIC_SITE_DOMAIN}
+ENV NEXT_PUBLIC_PREVIEW_BASE=${NEXT_PUBLIC_PREVIEW_BASE}
+
 RUN npm run build
 
 # Production image, copy all the files and run next

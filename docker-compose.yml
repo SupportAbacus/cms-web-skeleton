@@ -13,6 +13,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_KEY: ${NEXT_PUBLIC_SITE_KEY:-local-test}
+        NEXT_PUBLIC_SITE_DOMAIN: ${NEXT_PUBLIC_SITE_DOMAIN:-localhost}
+        NEXT_PUBLIC_PREVIEW_BASE: ${NEXT_PUBLIC_PREVIEW_BASE:-}
     container_name: web_skeleton_live
     restart: always
     environment:
@@ -21,10 +25,17 @@ services:
       HOSTNAME: "0.0.0.0"
       SITE_DOMAIN: ${SITE_DOMAIN:-yourdomain.com}
       # Remote CMS Public API endpoint (can be on a different server or cloud)
+      # cms-client.ts resolves CMS_API_BASE first, then CMS_BASE_URL, then CMS_API_URL
+      CMS_API_BASE: ${CMS_API_BASE:-}
       CMS_BASE_URL: ${CMS_BASE_URL:-http://localhost:3000}
       CMS_API_KEY: ${CMS_API_KEY:-pk_test_123}
+      CMS_SITE_KEY: ${CMS_SITE_KEY:-local-test}
+      NEXT_PUBLIC_SITE_KEY: ${NEXT_PUBLIC_SITE_KEY:-local-test}
+      NEXT_PUBLIC_SITE_DOMAIN: ${NEXT_PUBLIC_SITE_DOMAIN:-localhost}
+      CDN_URL: ${CDN_URL:-}
       # Inbound Cache Invalidation Webhook Secrets
       REVALIDATION_SECRET: ${REVALIDATION_SECRET:-dev-revalidation-secret-2026}
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:-${REVALIDATION_SECRET:-dev-revalidation-secret-2026}}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-dev-revalidation-secret-2026}
       DRAFT_MODE_SECRET: ${DRAFT_MODE_SECRET:-change-me}
       # Static Media & CDN
@@ -33,7 +44,8 @@ services:
       CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
     ports:
-      - "${PORT:-3000}:3000"
+      # Loopback only: the host nginx vhost proxies to this and terminates TLS.
+      - "127.0.0.1:${PORT:-3000}:3000"
     volumes:
       # Persistent named volume across container rebuilds to retain pre-rendered ISR cache
       - skeleton_isr_cache:/app/.next/cache
