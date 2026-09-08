@@ -1,0 +1,65 @@
+# ==============================================================================
+# Next.js Web Skeleton (Live Website) Standalone Production Stack
+# Platform: Next.js 14 App Router, ISR Standalone, Tailwind CSS v4
+# ==============================================================================
+# Usage:
+#   1. Copy .env.example to .env.local (or .env) and configure remote CMS details
+#   2. Run: docker compose up -d
+#   3. The website will run on port 3000 with persistent disk ISR caching.
+# ==============================================================================
+
+services:
+  live-site:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: web_skeleton_live
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      SITE_DOMAIN: ${SITE_DOMAIN:-yourdomain.com}
+      # Remote CMS Public API endpoint (can be on a different server or cloud)
+      CMS_BASE_URL: ${CMS_BASE_URL:-http://localhost:3000}
+      CMS_API_KEY: ${CMS_API_KEY:-pk_test_123}
+      # Inbound Cache Invalidation Webhook Secrets
+      REVALIDATION_SECRET: ${REVALIDATION_SECRET:-dev-revalidation-secret-2026}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-dev-revalidation-secret-2026}
+      DRAFT_MODE_SECRET: ${DRAFT_MODE_SECRET:-change-me}
+      # Static Media & CDN
+      S3_PUBLIC_DOMAIN: ${S3_PUBLIC_DOMAIN:-https://media.yourdomain.com}
+      # Cloudflare Zone Cache Purge (Optional)
+      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # Persistent named volume across container rebuilds to retain pre-rendered ISR cache
+      - skeleton_isr_cache:/app/.next/cache
+    networks:
+      - public_web
+
+  # Optional Standalone Nginx Reverse Proxy (Use with --profile proxy)
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: web_skeleton_proxy
+    restart: always
+    profiles:
+      - proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - live-site
+    networks:
+      - public_web
+
+volumes:
+  skeleton_isr_cache:
+
+networks:
+  public_web:
