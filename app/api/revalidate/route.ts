@@ -21,9 +21,14 @@ function cleanProcessedEvents() {
 }
 
 async function warmPath(req: NextRequest, path: string): Promise<string | null> {
-  const url = new URL(path, req.nextUrl.origin);
-  const res = await fetch(url, { cache: "no-store" });
-  return res.ok ? null : `${path}: ${res.status}`;
+  const port = process.env.PORT || "3000";
+  const url = `http://127.0.0.1:${port}${path.startsWith("/") ? path : "/" + path}`;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    return res.ok ? null : `${path}: ${res.status}`;
+  } catch (err: any) {
+    return `${path}: ${err.message}`;
+  }
 }
 
 function rateLimited(ip: string): boolean {

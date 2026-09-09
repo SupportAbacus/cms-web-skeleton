@@ -1,6 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { draftMode } from "next/headers";
 import { verifyDraftToken } from "@/lib/draft-token";
+import { getSafePublicOrigin } from "@/lib/origin";
 
 /**
  * GET /api/draft
@@ -11,9 +12,11 @@ import { verifyDraftToken } from "@/lib/draft-token";
  * the correct content page so editors see the unpublished draft.
  *
  * Query params:
- *   token  – HMAC-signed draft token produced by the CMS
- *   slug   – content slug (safety cross-check, also embedded in token)
- *   type   – collection type: blogs | products | services | content-items
+ *   token     - HMAC-signed draft token produced by the CMS
+ *   slug      - content slug (safety cross-check, also embedded in token)
+ *   type      - collection type: blogs | products | services | content-items
+ *   origin    - public origin passed by CMS
+ *   returnUrl - full destination URL passed by CMS
  */
 
 /** Maps CMS collection names -> frontend URL prefixes */
@@ -29,6 +32,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const token = searchParams.get("token") ?? "";
   const slugParam = searchParams.get("slug") ?? "";
   const typeParam = searchParams.get("type") ?? "";
+  const returnUrlParam = searchParams.get("returnUrl") ?? "";
 
   const secret = process.env.DRAFT_MODE_SECRET;
   if (!secret) {
@@ -73,11 +77,24 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // Enable Next.js draft mode so Server Components get uncached/draft data
   (await draftMode()).enable();
 
-  // Determine the redirect path
+  // Resolve safe public origin without leaking internal container 0.0.0.0
+  const safeOrigin = getSafePublicOrigin(req);
+
+  // If CMS passed explicit returnUrl, use it if it doesn't leak 0.0.0.0
+  if (returnUrlParam) {
+    try {
+      const parsed = new URL(returnUrlParam, safeOrigin);
+      if (!parsed.host.includes("0.0.0.0")) {
+        return NextResponse.redirect(parsed.toString());
+      }
+    } catch {}
+  }
+
+  // Fallback: build destination from collection map and resolved safe origin
   const prefix = COLLECTION_PATH_MAP[payload.type] ?? `/${payload.type}`;
   const destination = `${prefix}/${payload.slug}`;
 
-  return NextResponse.redirect(new URL(destination, req.nextUrl.origin));
+  return NextResponse.redirect(new URL(destination, safeOrigin));
 }
 
 /**

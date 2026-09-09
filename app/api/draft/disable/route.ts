@@ -1,5 +1,6 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { draftMode } from "next/headers";
+import { getSafePublicOrigin } from "@/lib/origin";
 
 /**
  * GET /api/draft/disable
@@ -8,6 +9,7 @@ import { draftMode } from "next/headers";
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   (await draftMode()).disable();
-  const home = new URL("/", req.nextUrl.origin);
+  const safeOrigin = getSafePublicOrigin(req);
+  const home = new URL("/", safeOrigin);
   return NextResponse.redirect(home);
 }
