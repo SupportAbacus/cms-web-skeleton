@@ -6,8 +6,6 @@ import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/comp
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Calendar } from "lucide-react";
 
-export const dynamic = "force-dynamic";
-
 export async function generateMetadata({ params }: { params: { type: string } }): Promise<Metadata> {
   const config = await getSiteConfig();
   return { robots: robotsForPath(config, `/${params.type}`) };

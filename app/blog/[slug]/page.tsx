@@ -9,8 +9,6 @@ import { ContactForm } from "@/components/ContactForm";
 import { TableOfContents } from "@/components/TableOfContents";
 import { ArrowLeft, Calendar, Clock, User, Sparkles } from "lucide-react";
 
-export const dynamic = "force-dynamic";
-
 interface Params {
   params: { slug: string };
 }

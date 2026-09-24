@@ -13,16 +13,21 @@ export async function generateMetadata(): Promise<Metadata> {
   const config = await getSiteConfig();
   const siteName = config.name || "Reference Site";
   return {
-    title: { default: siteName, template: `%s | ${siteName}` },
-    description: config.name
-      ? `Official site for ${config.name}`
-      : "Enterprise Headless CMS powered by Next.js 14, Tailwind CSS v4, and Payload CMS 3.0",
+    title: { default: siteName, template: `%s${config.seoDefaults?.titleSuffix || ` | ${siteName}`}` },
+    description: config.seoDefaults?.defaultDescription || `Official site for ${siteName}`,
+    openGraph: config.seoDefaults?.defaultSocialImage ? { images: [config.seoDefaults.defaultSocialImage] } : undefined,
   };
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const config = await getSiteConfig();
   const siteName = config.name || "Reference Site";
+  const navigation = [
+    { href: "/", label: "Home", enabled: true },
+    { href: "/blog", label: "Blog", enabled: config.allowedContentTypes.includes("blog") },
+    { href: "/product", label: "Products", enabled: config.allowedContentTypes.includes("product") },
+    { href: "/service", label: "Services", enabled: config.allowedContentTypes.includes("service") },
+  ].filter((item) => item.enabled);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -45,25 +50,21 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   <span className="text-lg font-semibold tracking-tight">{siteName}</span>
                 </Link>
                 <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-                  <Link href="/" className="text-foreground/80 transition-colors hover:text-foreground">
-                    Home
-                  </Link>
-                  <Link href="/blog" className="text-foreground/80 transition-colors hover:text-foreground">
-                    Blog
-                  </Link>
-                  <Link href="/product" className="text-foreground/80 transition-colors hover:text-foreground">
-                    Products
-                  </Link>
+                  {navigation.map((item) => (
+                    <Link key={item.href} href={item.href} className="text-foreground/80 transition-colors hover:text-foreground">
+                      {item.label}
+                    </Link>
+                  ))}
                 </nav>
               </div>
 
               <div className="flex items-center gap-3">
                 <ThemeToggle />
                 <Link
-                  href="/blog"
+                  href={navigation[1]?.href || "/"}
                   className="hidden sm:inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors"
                 >
-                  <span>Explore CMS</span>
+                  <span>Explore</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -85,37 +86,22 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                     <span className="text-base font-semibold">{siteName}</span>
                   </div>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    Autonomous Headless CMS ecosystem featuring multi-tenant site isolation, edge ISR caching, and Tailwind CSS v4 styling.
+                    {config.seoDefaults?.defaultDescription || `Official website for ${siteName}.`}
                   </p>
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold mb-3">Navigation</h4>
                   <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li>
-                      <Link href="/" className="hover:text-foreground transition-colors">
-                        Overview
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/blog" className="hover:text-foreground transition-colors">
-                        Technical Articles
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/product" className="hover:text-foreground transition-colors">
-                        Product Solutions
-                      </Link>
-                    </li>
+                    {navigation.map((item) => (
+                      <li key={item.href}>
+                        <Link href={item.href} className="hover:text-foreground transition-colors">{item.label}</Link>
+                      </li>
+                    ))}
                   </ul>
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold mb-3">Stack</h4>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li>Next.js 14 App Router</li>
-                    <li>Tailwind CSS v4 (CSS-first)</li>
-                    <li>shadcn/ui &amp; Radix</li>
-                    <li>Payload 3.0 Headless</li>
-                  </ul>
+                  <h4 className="text-sm font-semibold mb-3">Contact</h4>
+                  <p className="text-sm text-muted-foreground">{String(config.contactInfo?.supportEmail || "")}</p>
                 </div>
               </div>
 

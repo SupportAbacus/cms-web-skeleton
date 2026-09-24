@@ -7,7 +7,9 @@ High-performance Next.js 14 App Router live site skeleton designed for the Multi
 - **Next.js 14 App Router**: Server Components, streaming, and `output: 'standalone'`.
 - **Tailwind CSS v4**: CSS-first configuration via `@import "tailwindcss";` and `@theme` tokens (zero vanilla/raw CSS in `globals.css`).
 - **shadcn/ui & Radix Primitives**: Reusable, accessible UI components styled with `cva` (Button, Card, Badge, Accordion, ThemeToggle).
-- **Server-Only API Client (`lib/cms-client.ts`)**: Secure server-side fetching with `CMS_API_KEY` (`Bearer pk_...`) and built-in graceful fallback stubs.
+- **Server-Only API Client (`lib/cms-client.ts`)**: Secure server-side fetching with a tenant `CMS_API_KEY` (`Bearer sk_...`) and five-minute ISR revalidation.
+- **Tenant-Aware Shell**: Navigation and default metadata follow the site's enabled content types and SEO defaults from Payload.
+- **Code-Owned Design**: Routes, layouts, components, styling, header, and footer stay in this repository. CMS authors only update the predefined content, media, and SEO rendered by those templates.
 - **Docker Ready**: Multi-stage standalone Dockerfile exposing port 3000.
 
 ---
@@ -19,7 +21,7 @@ Create a `.env.local` file in the root of `cms-web-skeleton/`:
 ```env
 # CMS API Configuration
 CMS_BASE_URL=http://localhost:3000
-CMS_API_KEY=pk_test_123
+CMS_API_KEY=sk_test_123
 
 # CDN Configuration
 CDN_URL=https://cdn.example.com
@@ -67,7 +69,7 @@ docker build -t cms-web-skeleton .
 # Run container on port 3000
 docker run -p 3000:3000 \
   -e CMS_BASE_URL=http://payload_cms:3000 \
-  -e CMS_API_KEY=pk_test_123 \
+  -e CMS_API_KEY=sk_test_123 \
   cms-web-skeleton
 ```
 

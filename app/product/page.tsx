@@ -18,8 +18,6 @@ import {
   Layers
 } from "lucide-react";
 
-export const dynamic = "force-dynamic";
-
 export async function generateMetadata(): Promise<Metadata> {
   const config = await getSiteConfig();
   const siteName = config.name || "Enterprise Headless Platform";

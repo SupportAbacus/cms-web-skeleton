@@ -21,8 +21,6 @@ import {
   MessageSquare
 } from "lucide-react";
 
-export const dynamic = "force-dynamic";
-
 interface Params {
   params: { slug: string };
 }

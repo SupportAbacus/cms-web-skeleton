@@ -9,8 +9,6 @@ import { ProductCard } from "@/components/ProductCard";
 import { Product } from "@/types/cms";
 import { ArrowRight, BookOpen, Clock, Calendar, Sparkles, ShieldCheck, Zap, Globe, Package } from "lucide-react";
 
-export const dynamic = "force-dynamic";
-
 export async function generateMetadata(): Promise<Metadata> {
   const config = await getSiteConfig();
   return {
@@ -30,11 +28,12 @@ export default async function Home() {
     (await getContent(siteKey, "content-items", "home")) ||
     (await getContent(siteKey, "content-items", "index"));
 
-  const { items } = await listContent(siteKey, "blog", { limit: 6 });
-  const posts = items.slice(0, 6);
-
-  const { items: rawProducts } = await listContent(siteKey, "product", { limit: 6 });
-  const products = (rawProducts as unknown as Product[]).slice(0, 6);
+  const blogEnabled = config.allowedContentTypes.includes("blog");
+  const productEnabled = config.allowedContentTypes.includes("product");
+  const posts = blogEnabled ? (await listContent(siteKey, "blog", { limit: 6 })).items.slice(0, 6) : [];
+  const products = productEnabled
+    ? ((await listContent(siteKey, "product", { limit: 6 })).items as Product[]).slice(0, 6)
+    : [];
 
   return (
     <div className="flex flex-col gap-16 py-8 sm:py-12">
@@ -110,7 +109,7 @@ export default async function Home() {
       </section>
 
       {/* Product Solutions Showcase Section */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
+      {productEnabled ? <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/40 pb-6 mb-8 gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary mb-1">
@@ -146,10 +145,10 @@ export default async function Home() {
             ))}
           </div>
         )}
-      </section>
+      </section> : null}
 
       {/* Content Grid Section (CMS Only) */}
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
+      {blogEnabled ? <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/40 pb-6 mb-8 gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
@@ -247,7 +246,7 @@ export default async function Home() {
             })}
           </div>
         )}
-      </section>
+      </section> : null}
     </div>
   );
 }

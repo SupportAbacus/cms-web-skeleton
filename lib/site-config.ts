@@ -28,6 +28,13 @@ export type SiteConfig = {
   headerConnectors: HeaderConnectors;
   noIndexPaths: string[];
   contactInfo?: Record<string, unknown>;
+  allowedContentTypes: string[];
+  seoDefaults?: {
+    titleSuffix?: string;
+    defaultDescription?: string;
+    defaultSocialImage?: string;
+    organizationName?: string;
+  };
 };
 
 const ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -66,6 +73,12 @@ export function sanitizeSiteConfig(input: unknown): SiteConfig {
     name: typeof root.name === "string" ? root.name.trim() : undefined,
     domains: Array.isArray(root.domains) ? (root.domains as { host?: string; isPrimary?: boolean }[]) : [],
     contactInfo: root.contactInfo && typeof root.contactInfo === "object" ? (root.contactInfo as Record<string, unknown>) : {},
+    allowedContentTypes: Array.isArray(root.allowedContentTypes)
+      ? root.allowedContentTypes.filter((value): value is string => typeof value === "string")
+      : ["blog", "product", "service"],
+    seoDefaults: root.seoDefaults && typeof root.seoDefaults === "object"
+      ? root.seoDefaults as SiteConfig["seoDefaults"]
+      : {},
     headerConnectors: {
       googleTagManagerId: clean(c.googleTagManagerId, GTM),
       googleAnalyticsId: clean(c.googleAnalyticsId, GA),

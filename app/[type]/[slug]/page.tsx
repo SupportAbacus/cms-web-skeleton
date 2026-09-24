@@ -8,8 +8,6 @@ import { BlockDispatcher } from "@/components/blocks";
 import { ContactForm } from "@/components/ContactForm";
 import { ArrowLeft, Calendar, Clock, User } from "lucide-react";
 
-export const dynamic = "force-dynamic";
-
 interface Params {
   params: { type: string; slug: string };
 }

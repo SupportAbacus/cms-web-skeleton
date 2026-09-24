@@ -28,7 +28,7 @@ services:
       # cms-client.ts resolves CMS_API_BASE first, then CMS_BASE_URL, then CMS_API_URL
       CMS_API_BASE: ${CMS_API_BASE:-}
       CMS_BASE_URL: ${CMS_BASE_URL:-http://localhost:3000}
-      CMS_API_KEY: ${CMS_API_KEY:-pk_test_123}
+      CMS_API_KEY: ${CMS_API_KEY:-sk_test_123}
       CMS_SITE_KEY: ${CMS_SITE_KEY:-local-test}
       NEXT_PUBLIC_SITE_KEY: ${NEXT_PUBLIC_SITE_KEY:-local-test}
       NEXT_PUBLIC_SITE_DOMAIN: ${NEXT_PUBLIC_SITE_DOMAIN:-localhost}

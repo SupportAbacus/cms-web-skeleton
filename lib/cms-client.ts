@@ -1,30 +1,9 @@
 ﻿import "server-only";
-import fs from "fs";
-import path from "path";
 import type { Block, Blog, Product } from "../types/cms";
 import { sanitizeSiteConfig, type SiteConfig } from "./site-config";
 
-// Cache env file reads at module load time — avoid disk I/O on every request
-const _envCache = new Map<string, string>();
-(function loadEnvFile() {
-  try {
-    const envPath = path.resolve(process.cwd(), ".env.local");
-    if (fs.existsSync(envPath)) {
-      for (const line of fs.readFileSync(envPath, "utf-8").split(/\r?\n/)) {
-        const t = line.trim();
-        if (!t || t.startsWith("#")) continue;
-        const eq = t.indexOf("=");
-        if (eq !== -1) {
-          const k = t.slice(0, eq).trim();
-          const v = t.slice(eq + 1).trim();
-          if (k && v) _envCache.set(k, v);
-        }
-      }
-    }
-  } catch {}
-})();
 function getEnvVar(key: string, defaultValue: string = ""): string {
-  return _envCache.get(key) ?? process.env[key] ?? defaultValue;
+  return process.env[key] ?? defaultValue;
 }
 
 function getBaseUrl(): string {
@@ -42,10 +21,7 @@ function getBaseUrl(): string {
 }
 
 export function getApiKey(): string {
-  return (
-    getEnvVar("CMS_API_KEY") ||
-    "pk_-Uhi_Rplb8xd-r9HctU1QabL_dVudgIBLbD2fStAkAg"
-  );
+  return getEnvVar("CMS_API_KEY");
 }
 
 export function getDefaultSiteKey(): string {
@@ -232,9 +208,9 @@ export async function getAuthor(slugOrId: string | number, siteKey?: string): Pr
 
 export async function getSitemap(siteKey?: string): Promise<SitemapEntry[]> {
   const targetSiteKey = siteKey || getDefaultSiteKey();
-  const res = await fetchCmsResponse(`/api/v1/sitemap?siteKey=${targetSiteKey}`, ["cms:sitemap"], targetSiteKey);
-  if (!res) return [];
   try {
+    const res = await fetchCmsResponse(`/api/v1/sitemap?siteKey=${targetSiteKey}`, ["cms:sitemap"], targetSiteKey);
+    if (!res) return [];
     const xml = await res.text();
     return Array.from(xml.matchAll(/<loc>(.*?)<\/loc>/g), (m) => ({ url: m[1]! }));
   } catch {

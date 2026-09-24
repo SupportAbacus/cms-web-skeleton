@@ -6,9 +6,9 @@ This document details how to deploy the **Next.js 14 App Router Live Website** a
 
 ## 1. Architectural Principles
 
-* **100% Decoupled & Resilient:** Visitor traffic NEVER hits PostgreSQL or the Payload CMS control plane. 
-* **Outage Immunity:** If the CMS server or database is completely offline, all previously published content remains 100% served and cached via persistent Next.js disk ISR and Cloudflare R2 static origin fallback.
-* **On-Demand Cache Invalidation:** When an editor publishes content in Payload CMS, an HMAC-signed webhook arrives at `/api/revalidate`, purging both Next.js disk ISR tags (`revalidateTag`) and Cloudflare edge cache in < 3 seconds.
+* **Database-Decoupled:** The frontend has no database access or CMS code. Cache misses and revalidation fetch the authenticated Payload `/api/v1` API.
+* **Cached-Outage Behavior:** Previously generated pages may continue serving from Next.js/CDN caches during a CMS outage. Uncached content and expired refreshes still depend on Payload; direct R2 artifact fallback is not implemented yet.
+* **On-Demand Cache Invalidation:** Publishing sends an HMAC-signed webhook to `/api/revalidate`, which revalidates Next.js tags and paths and warms the affected routes.
 
 ---
 
@@ -28,7 +28,7 @@ nano .env.local
 Configure your remote CMS connection:
 ```env
 CMS_BASE_URL=https://cms.yourdomain.com
-CMS_API_KEY=pk_live_your_site_key
+CMS_API_KEY=sk_live_your_site_key
 REVALIDATION_SECRET=your_shared_revalidation_secret
 WEBHOOK_SECRET=your_shared_webhook_secret
 S3_PUBLIC_DOMAIN=https://media.yourdomain.com
