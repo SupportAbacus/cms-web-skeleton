@@ -5,7 +5,7 @@ import { getMediaUrl } from "@/lib/cms-client";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ArrowRight, Sparkles, Cpu, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ArrowRight, Sparkles, Cpu } from "lucide-react";
 
 interface ProductCardProps {
   product: Product;

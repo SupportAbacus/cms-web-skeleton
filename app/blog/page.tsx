@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listContent, getCategories, formatDate, getAuthor, getSiteConfig, getMediaUrl } from "@/lib/cms-client";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Calendar, Clock, BookOpen, User } from "lucide-react";
+import { ArrowRight, Clock, BookOpen, User } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -12,18 +12,19 @@ export const metadata: Metadata = {
 };
 
 interface BlogIndexProps {
-  searchParams: {
+  searchParams: Promise<{
     category?: string;
     cursor?: string;
-  };
+  }>;
 }
 
 export default async function BlogIndexPage({ searchParams }: BlogIndexProps) {
+  const query = await searchParams;
   const config = await getSiteConfig();
   const siteKey = config.key || process.env.CMS_SITE_KEY || process.env.NEXT_PUBLIC_SITE_KEY || "local-test";
 
   const categories = await getCategories();
-  const selectedCategorySlug = searchParams.category || "all";
+  const selectedCategorySlug = query.category || "all";
 
   const filters: Record<string, string> = {};
   if (selectedCategorySlug !== "all") {
@@ -33,8 +34,8 @@ export default async function BlogIndexPage({ searchParams }: BlogIndexProps) {
     }
   }
 
-  const { items, nextCursor, total } = await listContent(siteKey, "blog", {
-    cursor: searchParams.cursor,
+  const { items, nextCursor } = await listContent(siteKey, "blog", {
+    cursor: query.cursor,
     limit: 10,
     filters,
   });

@@ -6,13 +6,8 @@ import {
   Play,
   Clock,
   Sliders,
-  CheckCircle2,
   RefreshCw,
-  Layers,
-  Database,
   Calendar,
-  AlertCircle,
-  Zap,
 } from "lucide-react";
 
 export interface WarmJobResult {

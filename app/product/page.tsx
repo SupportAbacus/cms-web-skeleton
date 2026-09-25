@@ -8,12 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ShieldCheck,
-  Zap,
   Globe2,
   Headphones,
   CheckCircle2,
   ArrowRight,
-  SlidersHorizontal,
   Package,
   Layers
 } from "lucide-react";
@@ -31,13 +29,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ProductCatalogPage({
   searchParams,
 }: {
-  searchParams: { cursor?: string };
+  searchParams: Promise<{ cursor?: string }>;
 }) {
+  const query = await searchParams;
   const config = await getSiteConfig();
   const siteKey = config.key || process.env.CMS_SITE_KEY || process.env.NEXT_PUBLIC_SITE_KEY || "local-test";
 
-  const { items, total } = await listContent(siteKey, "product", {
-    cursor: searchParams.cursor,
+  const { items } = await listContent(siteKey, "product", {
+    cursor: query.cursor,
     limit: 50,
   });
 

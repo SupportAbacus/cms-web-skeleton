@@ -29,15 +29,17 @@ services:
       CMS_API_BASE: ${CMS_API_BASE:-}
       CMS_BASE_URL: ${CMS_BASE_URL:-http://localhost:3000}
       CMS_API_KEY: ${CMS_API_KEY:-sk_test_123}
+      CMS_ARTIFACT_BASE_URL: ${CMS_ARTIFACT_BASE_URL:-}
       CMS_SITE_KEY: ${CMS_SITE_KEY:-local-test}
       NEXT_PUBLIC_SITE_KEY: ${NEXT_PUBLIC_SITE_KEY:-local-test}
       NEXT_PUBLIC_SITE_DOMAIN: ${NEXT_PUBLIC_SITE_DOMAIN:-localhost}
       CDN_URL: ${CDN_URL:-}
       # Inbound Cache Invalidation Webhook Secrets
-      REVALIDATION_SECRET: ${REVALIDATION_SECRET:-dev-revalidation-secret-2026}
-      REVALIDATE_SECRET: ${REVALIDATE_SECRET:-${REVALIDATION_SECRET:-dev-revalidation-secret-2026}}
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-dev-revalidation-secret-2026}
-      DRAFT_MODE_SECRET: ${DRAFT_MODE_SECRET:-change-me}
+      REVALIDATION_SECRET: ${REVALIDATION_SECRET:?REVALIDATION_SECRET is required}
+      REVALIDATE_SECRET: ${REVALIDATE_SECRET:-${REVALIDATION_SECRET}}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?WEBHOOK_SECRET is required}
+      DRAFT_MODE_SECRET: ${DRAFT_MODE_SECRET:?DRAFT_MODE_SECRET is required}
+      REDIS_URL: ${REDIS_URL:?REDIS_URL is required}
       # Static Media & CDN
       S3_PUBLIC_DOMAIN: ${S3_PUBLIC_DOMAIN:-https://media.yourdomain.com}
       # Cloudflare Zone Cache Purge (Optional)

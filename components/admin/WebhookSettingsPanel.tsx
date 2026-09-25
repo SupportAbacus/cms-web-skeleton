@@ -80,7 +80,7 @@ export function WebhookSettingsPanel({ siteKey = "brand-a" }: { siteKey?: string
   const [showNewModal, setShowNewModal] = useState(false);
   const [newUrl, setNewUrl] = useState("");
   const [newName, setNewName] = useState("");
-  const [newEvents, setNewEvents] = useState<string[]>(["blog.publish", "blog.update"]);
+  const newEvents = ["blog.publish", "blog.update"];
 
   const selectedWebhook = webhooks.find((w) => w.id === selectedWebhookId) || webhooks[0];
 

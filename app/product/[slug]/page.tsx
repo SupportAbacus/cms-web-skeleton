@@ -14,21 +14,24 @@ import {
   Cpu,
   ShieldCheck,
   Zap,
-  Package,
-  Layers,
   Sparkles,
   FileText,
   MessageSquare
 } from "lucide-react";
 
 interface Params {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
+}
+
+export function generateStaticParams() {
+  return [];
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { slug } = await params;
   const config = await getSiteConfig();
   const siteKey = config.key || process.env.CMS_SITE_KEY || process.env.NEXT_PUBLIC_SITE_KEY || "local-test";
-  const content = await getContent(siteKey, "product", params.slug);
+  const content = await getContent(siteKey, "product", slug);
   if (!content) return {};
 
   const product = content as unknown as Product;
@@ -42,17 +45,18 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     description,
     alternates: seo?.canonical ? { canonical: seo.canonical } : undefined,
     robots:
-      robotsForPath(config, `/product/${params.slug}`) ??
+      robotsForPath(config, `/product/${slug}`) ??
       (seo?.indexing === "noindex" ? { index: false, follow: false } : undefined),
     openGraph: heroUrl ? { images: [heroUrl] } : undefined,
   };
 }
 
 export default async function ProductDetailPage({ params }: Params) {
+  const { slug } = await params;
   const config = await getSiteConfig();
   const siteKey = config.key || process.env.CMS_SITE_KEY || process.env.NEXT_PUBLIC_SITE_KEY || "local-test";
 
-  const content = await getContent(siteKey, "product", params.slug);
+  const content = await getContent(siteKey, "product", slug);
   if (!content) notFound();
 
   const product = content as unknown as Product;

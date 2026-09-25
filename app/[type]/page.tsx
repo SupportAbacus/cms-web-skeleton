@@ -6,20 +6,22 @@ import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/comp
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Calendar } from "lucide-react";
 
-export async function generateMetadata({ params }: { params: { type: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ type: string }> }): Promise<Metadata> {
+  const { type } = await params;
   const config = await getSiteConfig();
-  return { robots: robotsForPath(config, `/${params.type}`) };
+  return { robots: robotsForPath(config, `/${type}`) };
 }
 
 export default async function ListingPage({
   params,
 }: {
-  params: { type: string };
+  params: Promise<{ type: string }>;
 }) {
+  const { type } = await params;
   const config = await getSiteConfig();
   const siteKey = config.key || process.env.CMS_SITE_KEY || process.env.NEXT_PUBLIC_SITE_KEY || "local-test";
-  const { items } = await listContent(siteKey, params.type, {});
-  const label = params.type.charAt(0).toUpperCase() + params.type.slice(1);
+  const { items } = await listContent(siteKey, type, {});
+  const label = type.charAt(0).toUpperCase() + type.slice(1);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
@@ -33,7 +35,7 @@ export default async function ListingPage({
 
       {items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/60 p-12 text-center">
-          <p className="text-muted-foreground">No published {params.type} records yet.</p>
+          <p className="text-muted-foreground">No published {type} records yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

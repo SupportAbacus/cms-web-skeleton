@@ -1,13 +1,13 @@
 # Multi-Tenant Next.js Web Skeleton (`cms-web-skeleton`)
 
-High-performance Next.js 14 App Router live site skeleton designed for the Multi-Site Headless CMS Ecosystem (Payload CMS 3.0 + Next.js ISR + Cloudflare R2 + Docker).
+High-performance Next.js 15 App Router live site skeleton designed for the Multi-Site Headless CMS Ecosystem (Payload CMS 3.0 + Next.js ISR + Cloudflare R2 + Docker).
 
 ## ?? Key Features
 
-- **Next.js 14 App Router**: Server Components, streaming, and `output: 'standalone'`.
+- **Next.js 15 App Router**: Server Components, streaming, and `output: 'standalone'`.
 - **Tailwind CSS v4**: CSS-first configuration via `@import "tailwindcss";` and `@theme` tokens (zero vanilla/raw CSS in `globals.css`).
 - **shadcn/ui & Radix Primitives**: Reusable, accessible UI components styled with `cva` (Button, Card, Badge, Accordion, ThemeToggle).
-- **Server-Only API Client (`lib/cms-client.ts`)**: Secure server-side fetching with a tenant `CMS_API_KEY` (`Bearer sk_...`) and five-minute ISR revalidation.
+- **Verified artifact-first delivery (`lib/cms-client.ts`)**: Published detail pages resolve an immutable revision from the R2/S3 manifest, verify its full SHA-256 content hash, then serve generated Next.js/edge-cached HTML. Publish webhooks are rejected unless the referenced revision verifies before warming. `/api/v1` remains the fallback for unavailable artifacts and read models that are not artifactized yet.
 - **Tenant-Aware Shell**: Navigation and default metadata follow the site's enabled content types and SEO defaults from Payload.
 - **Code-Owned Design**: Routes, layouts, components, styling, header, and footer stay in this repository. CMS authors only update the predefined content, media, and SEO rendered by those templates.
 - **Docker Ready**: Multi-stage standalone Dockerfile exposing port 3000.
@@ -22,6 +22,7 @@ Create a `.env.local` file in the root of `cms-web-skeleton/`:
 # CMS API Configuration
 CMS_BASE_URL=http://localhost:3000
 CMS_API_KEY=sk_test_123
+CMS_ARTIFACT_BASE_URL=https://artifacts.example.com
 
 # CDN Configuration
 CDN_URL=https://cdn.example.com

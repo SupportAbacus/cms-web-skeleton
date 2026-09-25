@@ -1,26 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag, revalidatePath } from "next/cache";
 import { hmacVerify } from "../../../lib/security";
+import { verifyArtifactRevision } from "../../../lib/cms-client";
+import { claimEvent, rateLimited, releaseEvent } from "../../../lib/distributed-guard";
 
 const SECRET = process.env.WEBHOOK_SECRET ?? process.env.REVALIDATE_SECRET ?? process.env.REVALIDATION_SECRET ?? "";
 const WINDOW_MS = 5 * 60 * 1000;
-const IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
 const LIMIT = 30;
 
-const hits = new Map<string, number[]>();
-// ponytail: in-memory idempotency cache (eventId -> timestamp), swap for shared store if multi-instance
-const processedEvents = new Map<string, number>();
-
-function cleanProcessedEvents() {
-  const now = Date.now();
-  for (const [eventId, ts] of processedEvents.entries()) {
-    if (now - ts > IDEMPOTENCY_TTL_MS) {
-      processedEvents.delete(eventId);
-    }
-  }
-}
-
-async function warmPath(req: NextRequest, path: string): Promise<string | null> {
+async function warmPath(path: string): Promise<string | null> {
   const port = process.env.PORT || "3000";
   const url = `http://127.0.0.1:${port}${path.startsWith("/") ? path : "/" + path}`;
   try {
@@ -31,19 +19,13 @@ async function warmPath(req: NextRequest, path: string): Promise<string | null> 
   }
 }
 
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < 60_000);
-  recent.push(now);
-  hits.set(ip, recent);
-  // ponytail: simple in-memory map, swap for shared store if multi-instance
-  return recent.length > LIMIT;
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (!SECRET) {
+    return NextResponse.json({ ok: false, error: "webhook_secret_not_configured" }, { status: 503 });
+  }
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  if (rateLimited(ip)) {
+  if (await rateLimited(`revalidate:${ip}`, LIMIT)) {
     return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
   }
 
@@ -60,41 +42,58 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const body = await req.text();
-  if (SECRET && !hmacVerify(`${ts}.${body}`, SECRET, sig)) {
+  if (!hmacVerify(`${ts}.${body}`, SECRET, sig)) {
     return NextResponse.json({ ok: false, error: "bad_signature" }, { status: 401 });
   }
 
-  let payload: { contentType?: string; slug?: string; eventId?: string };
+  let payload: { siteKey?: string; contentType?: string; slug?: string; eventId?: string; event?: string; revisionId?: string; contentHash?: string; artifactPath?: string };
   try {
-    payload = JSON.parse(body) as { contentType?: string; slug?: string; eventId?: string };
+    payload = JSON.parse(body);
   } catch {
     return NextResponse.json({ ok: false, error: "bad_json" }, { status: 400 });
   }
 
-  const { contentType, slug, eventId } = payload;
+  const { siteKey, contentType, slug, eventId, event, revisionId, contentHash, artifactPath } = payload;
 
-  // Idempotency check
-  if (eventId) {
-    cleanProcessedEvents();
-    if (processedEvents.has(eventId)) {
-      return NextResponse.json({ ok: true, message: "event_already_processed", eventId }, { status: 200 });
+  if (
+    !siteKey || !contentType || !slug || !eventId || !event ||
+    !/^[a-z0-9-]{1,64}$/.test(siteKey) || !/^[a-z0-9-]{1,64}$/.test(contentType) ||
+    !/^[a-z0-9][a-z0-9-]{0,199}$/.test(slug) || !/^evt_[a-f0-9]{16}$/.test(eventId)
+  ) {
+    return NextResponse.json({ ok: false, error: "invalid_fields" }, { status: 400 });
+  }
+
+  const removed = event.endsWith(".deleted") || event.endsWith(".unpublished");
+  if (!removed) {
+    if (!revisionId || !contentHash || !artifactPath || !await verifyArtifactRevision({ siteKey, contentType, slug, revisionId, contentHash, artifactPath })) {
+      return NextResponse.json({ ok: false, error: "artifact_verification_failed" }, { status: 502 });
     }
-    processedEvents.set(eventId, Date.now());
+  }
+  const claimKey = `${siteKey}:${eventId}`;
+  if (!await claimEvent(claimKey)) {
+    return NextResponse.json({ ok: true, message: "event_already_processed", eventId }, { status: 200 });
   }
 
-  if (!contentType || !slug) {
-    return NextResponse.json({ ok: false, error: "missing_fields" }, { status: 400 });
-  }
-
-  revalidateTag(`cms:${contentType}:${slug}`);
-  revalidateTag(`cms:${contentType}`);
+  const routeType = ({ blogs: "blog", products: "product", services: "service", "content-items": "page" } as Record<string, string>)[contentType] || contentType;
+  revalidateTag(`cms:${siteKey}:${routeType}:${slug}`);
+  revalidateTag(`cms:${siteKey}:${routeType}`);
+  revalidateTag(`cms:${siteKey}:manifest`);
+  revalidateTag(`cms:${siteKey}:public`);
+  revalidateTag(`cms:${routeType}:${slug}`);
+  revalidateTag(`cms:${routeType}`);
   revalidateTag("cms:sitemap");
   revalidateTag("cms:redirects");
-  const paths = ["/", `/${contentType}`, `/${contentType}/${slug}`, "/sitemap.xml"];
+  const collectionPath = routeType === "page" ? "/" : `/${routeType}`;
+  const detailPath = routeType === "page" ? (["home", "index"].includes(slug) ? "/" : `/${slug}`) : `/${routeType}/${slug}`;
+  const paths = routeType === "public"
+    ? ["/", "/blog", "/product", "/service", "/sitemap.xml", "/robots.txt"]
+    : Array.from(new Set(["/", collectionPath, detailPath, "/sitemap.xml", "/robots.txt"]));
   for (const path of paths) revalidatePath(path);
 
-  const warmFailures = (await Promise.all(paths.map((path) => warmPath(req, path)))).filter(Boolean);
+  const warmPaths = removed ? paths.filter((path) => path !== detailPath) : paths;
+  const warmFailures = (await Promise.all(warmPaths.map(warmPath))).filter(Boolean);
   if (warmFailures.length > 0) {
+    await releaseEvent(claimKey);
     return NextResponse.json({ ok: false, error: "cache_warm_failed", failed: warmFailures }, { status: 502 });
   }
 

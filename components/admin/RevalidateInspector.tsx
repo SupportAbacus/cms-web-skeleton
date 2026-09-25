@@ -24,7 +24,6 @@ export interface PageCacheMetrics {
 
 export function RevalidateInspector({
   initialPath = "/",
-  siteKey = process.env.NEXT_PUBLIC_SITE_KEY || "brand-a",
 }: {
   initialPath?: string;
   siteKey?: string;

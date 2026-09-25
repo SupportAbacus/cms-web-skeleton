@@ -1,14 +1,14 @@
 # Standalone Deployment Guide: Live Website (`cms-web-skeleton`)
 
-This document details how to deploy the **Next.js 14 App Router Live Website** as an autonomous, standalone consumer frontend. It has **zero database dependencies, zero database credentials, and zero CMS code**.
+This document details how to deploy the **Next.js 15 App Router Live Website** as an autonomous, standalone consumer frontend. It has **zero database dependencies, zero database credentials, and zero CMS code**.
 
 ---
 
 ## 1. Architectural Principles
 
-* **Database-Decoupled:** The frontend has no database access or CMS code. Cache misses and revalidation fetch the authenticated Payload `/api/v1` API.
-* **Cached-Outage Behavior:** Previously generated pages may continue serving from Next.js/CDN caches during a CMS outage. Uncached content and expired refreshes still depend on Payload; direct R2 artifact fallback is not implemented yet.
-* **On-Demand Cache Invalidation:** Publishing sends an HMAC-signed webhook to `/api/revalidate`, which revalidates Next.js tags and paths and warms the affected routes.
+* **Database-Decoupled:** The frontend has no database access or CMS code. Detail-page cache misses resolve and verify immutable R2/S3 artifacts; remaining read models use the authenticated Payload `/api/v1` API.
+* **Cached-Outage Behavior:** Published detail pages are generated from R2/S3 artifacts and remain available from Next.js/CDN caches during a CMS outage. Lists and other public read models still depend on Payload when their caches are cold.
+* **On-Demand Cache Invalidation:** Publishing sends an HMAC-signed webhook to `/api/revalidate`. The endpoint verifies the exact artifact revision and SHA-256 hash before revalidating and warming affected routes.
 
 ---
 
@@ -29,6 +29,7 @@ Configure your remote CMS connection:
 ```env
 CMS_BASE_URL=https://cms.yourdomain.com
 CMS_API_KEY=sk_live_your_site_key
+CMS_ARTIFACT_BASE_URL=https://artifacts.example.com
 REVALIDATION_SECRET=your_shared_revalidation_secret
 WEBHOOK_SECRET=your_shared_webhook_secret
 S3_PUBLIC_DOMAIN=https://media.yourdomain.com
@@ -52,13 +53,14 @@ docker compose --profile proxy up -d
 
 ### Option B: Serverless Platforms (Vercel, Netlify, Cloudflare Pages, AWS Amplify)
 
-Because `cms-web-skeleton` is a standard Next.js 14 App Router project with zero native binary requirements or database adapters:
+Because `cms-web-skeleton` is a standard Next.js 15 App Router project with zero native binary requirements or database adapters:
 
 1. Connect your repository to **Vercel** or your preferred PaaS.
 2. Set the **Root Directory** to `cms-web-skeleton`.
 3. Configure the following environment variables in your platform's dashboard:
    * `CMS_BASE_URL`: The public HTTPS URL of your remote Payload CMS.
-   * `CMS_API_KEY`: The site's `pk_...` Bearer token.
+   * `CMS_API_KEY`: The site's server-only `sk_...` key used for API fallback.
+   * `CMS_ARTIFACT_BASE_URL`: Public custom domain serving the site's R2/S3 artifacts.
    * `REVALIDATION_SECRET`: Shared secret for `/api/revalidate`.
    * `WEBHOOK_SECRET`: Shared secret for signed webhook delivery.
    * `S3_PUBLIC_DOMAIN`: Public CDN URL for images.

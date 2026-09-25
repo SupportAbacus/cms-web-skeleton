@@ -3,13 +3,10 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  ShieldCheck,
   ShieldAlert,
   Loader2,
   Clock,
-  ExternalLink,
   CheckCircle,
-  KeyRound,
 } from "lucide-react";
 
 function MagicAuthInner() {

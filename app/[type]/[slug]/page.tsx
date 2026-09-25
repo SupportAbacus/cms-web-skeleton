@@ -9,17 +9,22 @@ import { ContactForm } from "@/components/ContactForm";
 import { ArrowLeft, Calendar, Clock, User } from "lucide-react";
 
 interface Params {
-  params: { type: string; slug: string };
+  params: Promise<{ type: string; slug: string }>;
+}
+
+export function generateStaticParams() {
+  return [];
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { type, slug } = await params;
   const config = await getSiteConfig();
   const siteKey = config.key || process.env.CMS_SITE_KEY || process.env.NEXT_PUBLIC_SITE_KEY || "local-test";
-  const content = await getContent(siteKey, params.type, params.slug);
+  const content = await getContent(siteKey, type, slug);
   if (!content) return {};
   const seo = content.seo;
   const robots =
-    robotsForPath(config, `/${params.type}/${params.slug}`) ??
+    robotsForPath(config, `/${type}/${slug}`) ??
     (seo?.indexing === "noindex" ? { index: false, follow: false } : undefined);
   return {
     title: seo?.title ?? content.title,
@@ -31,10 +36,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 export default async function ContentPage({ params }: Params) {
+  const { type, slug } = await params;
   const config = await getSiteConfig();
   const siteKey = config.key || process.env.CMS_SITE_KEY || process.env.NEXT_PUBLIC_SITE_KEY || "local-test";
 
-  const content = await getContent(siteKey, params.type, params.slug);
+  const content = await getContent(siteKey, type, slug);
   if (!content) notFound();
 
   const author = content.authorId ? await getAuthor(content.authorId) : null;

@@ -3,15 +3,10 @@
 import React, { useState } from "react";
 import {
   Activity,
-  CheckCircle2,
   RefreshCw,
   Zap,
   Layers,
   Radio,
-  Clock,
-  ArrowUpRight,
-  ShieldCheck,
-  Server,
   Cloud,
 } from "lucide-react";
 

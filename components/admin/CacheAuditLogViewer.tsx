@@ -4,15 +4,8 @@ import React, { useState, useMemo } from "react";
 import {
   FileText,
   Download,
-  Filter,
   Search,
   RefreshCw,
-  Layers,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  Trash2,
-  Flame,
 } from "lucide-react";
 
 export interface CacheLogEntry {
@@ -97,7 +90,7 @@ const INITIAL_CACHE_LOGS: CacheLogEntry[] = [
 ];
 
 export function CacheAuditLogViewer() {
-  const [logs, setLogs] = useState<CacheLogEntry[]>(INITIAL_CACHE_LOGS);
+  const [logs] = useState<CacheLogEntry[]>(INITIAL_CACHE_LOGS);
   const [searchQuery, setSearchQuery] = useState("");
   const [siteFilter, setSiteFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");

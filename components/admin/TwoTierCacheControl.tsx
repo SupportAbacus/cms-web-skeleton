@@ -6,12 +6,9 @@ import {
   Trash2,
   Database,
   Cloud,
-  CheckCircle2,
-  AlertCircle,
   RefreshCw,
   Layers,
   ArrowRight,
-  Zap,
 } from "lucide-react";
 
 export interface CacheTierStatus {
@@ -30,7 +27,7 @@ export interface CacheTierStatus {
   isrPaths: string[];
 }
 
-export function TwoTierCacheControl({ siteKey = process.env.NEXT_PUBLIC_SITE_KEY || "brand-a" }: { siteKey?: string }) {
+export function TwoTierCacheControl({}: { siteKey?: string }) {
   const [isRunning, setIsRunning] = useState(false);
   const [activeAction, setActiveAction] = useState<"warm" | "purge-tier1" | "sync-tier2" | null>(null);
   const [targetPath, setTargetPath] = useState<string>("/blog");

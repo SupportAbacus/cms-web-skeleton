@@ -1,5 +1,5 @@
 ﻿import "server-only";
-import type { Block, Blog, Product } from "../types/cms";
+import type { Blog, Product } from "../types/cms";
 import { sanitizeSiteConfig, type SiteConfig } from "./site-config";
 
 function getEnvVar(key: string, defaultValue: string = ""): string {
@@ -18,6 +18,179 @@ function getBaseUrl(): string {
     url = "http://localhost:3000";
   }
   return url;
+}
+
+function getArtifactBaseUrl(): string {
+  return getEnvVar("CMS_ARTIFACT_BASE_URL").replace(/\/$/, "");
+}
+
+function publicContentType(type: string): string {
+  return ({ blogs: "blog", products: "product", services: "service", "content-items": "page" } as Record<string, string>)[type] || type;
+}
+
+function artifactCollection(type: string): string {
+  return ({ blog: "blogs", blogs: "blogs", product: "products", products: "products", service: "services", services: "services", "content-items": "page" } as Record<string, string>)[type] || type;
+}
+
+interface ArtifactEnvelope {
+  schemaVersion: 1;
+  siteKey: string;
+  collection: string;
+  slug: string;
+  revisionId: string;
+  contentHash: string;
+  data: Record<string, any>;
+}
+
+interface ArtifactManifest {
+  entries: Record<string, { revisionId: string; path: string; contentHash: string }>;
+}
+
+interface PublicReadModel {
+  siteConfig: SiteConfig;
+  lists: Record<string, PublishedContent[]>;
+  categories: Category[];
+  authors: Author[];
+  redirects: RedirectEntry[];
+  sitemap: SitemapEntry[];
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  let bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+    bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  return JSON.parse(new TextDecoder().decode(bytes)) as T;
+}
+
+async function sha256(value: unknown): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function validArtifactPath(path: string, siteKey: string, collection: string, slug: string, revisionId: string): boolean {
+  return path === `sites/${siteKey}/content/${collection}/${slug}/${revisionId}.json`;
+}
+
+async function readVerifiedEnvelope(
+  baseUrl: string,
+  path: string,
+  expected: { siteKey: string; collection: string; slug: string; revisionId: string; contentHash: string },
+  options: RequestInit & { next?: { tags?: string[] } },
+): Promise<ArtifactEnvelope | null> {
+  if (!validArtifactPath(path, expected.siteKey, expected.collection, expected.slug, expected.revisionId)) return null;
+  const response = await fetch(`${baseUrl}/${path.split("/").map(encodeURIComponent).join("/")}`, options);
+  if (!response.ok) return null;
+  const envelope = await readJson<ArtifactEnvelope>(response);
+  if (
+    envelope.schemaVersion !== 1 || envelope.siteKey !== expected.siteKey ||
+    envelope.collection !== expected.collection || envelope.slug !== expected.slug ||
+    String(envelope.revisionId) !== String(expected.revisionId) ||
+    envelope.contentHash !== expected.contentHash
+  ) return null;
+  const actualHash = await sha256(envelope.data);
+  return actualHash === expected.contentHash ? envelope : null;
+}
+
+function relationId(value: unknown): number | null {
+  const id = value && typeof value === "object" ? (value as { id?: unknown }).id : value;
+  const number = Number(id);
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeArtifact(raw: Record<string, any>, type: string): PublishedContent {
+  const blocks = Array.isArray(raw.body) ? raw.body : Array.isArray(raw.content) ? raw.content : [];
+  return {
+    ...raw,
+    contentType: publicContentType(type),
+    status: String(raw.status || "published").toUpperCase(),
+    featured: Boolean(raw.featured),
+    categoryId: relationId(raw.categoryId ?? raw.category),
+    authorId: relationId(raw.authorId ?? raw.author),
+    publishDate: raw.publishDate || null,
+    seo: {
+      ...raw.seo,
+      title: raw.seo?.title || raw.seo?.metaTitle,
+      canonical: raw.seo?.canonical || raw.seo?.canonicalUrl,
+      socialImage: raw.seo?.socialImage || raw.seo?.ogImage,
+      indexing: raw.seo?.indexing || (raw.seo?.noIndex ? "noindex" : "index"),
+    },
+    body: blocks.map((block: Record<string, any>) => block.type ? block : {
+      type: block.blockType,
+      data: block.data || Object.fromEntries(Object.entries(block).filter(([key]) => !["id", "blockName", "blockType"].includes(key))),
+    }),
+    data: raw.data || {},
+  } as PublishedContent;
+}
+
+async function fetchArtifact(siteKey: string, type: string, slug: string, tags: string[]): Promise<PublishedContent | null> {
+  const baseUrl = getArtifactBaseUrl();
+  if (!baseUrl) return null;
+  try {
+    const manifestResponse = await fetch(`${baseUrl}/sites/${encodeURIComponent(siteKey)}/manifest.json`, {
+      cache: "force-cache",
+      next: { tags: [...tags, `cms:${siteKey}:manifest`] },
+    });
+    if (!manifestResponse.ok) return null;
+    const manifest = await readJson<ArtifactManifest>(manifestResponse);
+    const collection = artifactCollection(type);
+    const entry = manifest.entries?.[`${collection}/${slug}`];
+    if (!entry) return null;
+    const envelope = await readVerifiedEnvelope(baseUrl, entry.path, {
+      siteKey, collection, slug, revisionId: entry.revisionId, contentHash: entry.contentHash,
+    }, { cache: "force-cache", next: { tags } });
+    return envelope ? normalizeArtifact(envelope.data, type) : null;
+  } catch (error: any) {
+    console.warn(`[CMS Client] Artifact read failed for ${type}/${slug}:`, error?.message);
+    return null;
+  }
+}
+
+async function fetchPublicModel(siteKey: string): Promise<PublicReadModel | null> {
+  const baseUrl = getArtifactBaseUrl();
+  if (!baseUrl) return null;
+  const tags = [`cms:${siteKey}:public`];
+  try {
+    const manifestResponse = await fetch(`${baseUrl}/sites/${encodeURIComponent(siteKey)}/manifest.json`, {
+      cache: "force-cache",
+      next: { tags: [...tags, `cms:${siteKey}:manifest`] },
+    });
+    if (!manifestResponse.ok) return null;
+    const manifest = await readJson<ArtifactManifest>(manifestResponse);
+    const entry = manifest.entries?.["public/index"];
+    if (!entry) return null;
+    const envelope = await readVerifiedEnvelope(baseUrl, entry.path, {
+      siteKey, collection: "public", slug: "index", revisionId: entry.revisionId, contentHash: entry.contentHash,
+    }, { cache: "force-cache", next: { tags } });
+    return envelope?.data as PublicReadModel || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function verifyArtifactRevision(input: {
+  siteKey: string;
+  contentType: string;
+  slug: string;
+  revisionId: string;
+  contentHash: string;
+  artifactPath: string;
+}): Promise<boolean> {
+  const baseUrl = getArtifactBaseUrl();
+  if (!baseUrl || !/^[a-f0-9]{64}$/.test(input.contentHash)) return false;
+  try {
+    return Boolean(await readVerifiedEnvelope(baseUrl, input.artifactPath, {
+      siteKey: input.siteKey,
+      collection: artifactCollection(input.contentType),
+      slug: input.slug,
+      revisionId: input.revisionId,
+      contentHash: input.contentHash,
+    }, { cache: "no-store" }));
+  } catch {
+    return false;
+  }
 }
 
 export function getApiKey(): string {
@@ -83,7 +256,8 @@ export interface BlogMdxResponse {
 export async function fetchCmsResponse(
   path: string,
   tags: string[],
-  siteKey?: string
+  siteKey?: string,
+  revalidate: number | false = 300
 ): Promise<Response | null> {
   const baseUrl = getBaseUrl();
   const apiKey = getApiKey();
@@ -104,7 +278,7 @@ export async function fetchCmsResponse(
     const res = await fetch(`${baseUrl}${path}`, {
       headers,
       signal: controller.signal,
-      next: { revalidate: 300, tags: tags },
+      next: { revalidate, tags },
     });
     clearTimeout(timeoutId);
 
@@ -121,10 +295,11 @@ export async function fetchCmsResponse(
 async function fetchCms<T>(
   path: string,
   tags: string[],
-  siteKey?: string
+  siteKey?: string,
+  revalidate: number | false = 300
 ): Promise<T | null> {
   try {
-    const res = await fetchCmsResponse(path, tags, siteKey);
+    const res = await fetchCmsResponse(path, tags, siteKey, revalidate);
     if (!res) return null;
     return (await res.json()) as T;
   } catch (err: any) {
@@ -138,6 +313,18 @@ export async function listContent(
   type: string = "blog",
   opts: ListParams = {}
 ): Promise<ListResponse<PublishedContent>> {
+  const publicModel = await fetchPublicModel(siteKey);
+  if (publicModel) {
+    const normalizedType = publicContentType(type);
+    let items = (publicModel.lists?.[normalizedType] || []).map((item) => normalizeArtifact(item as any, normalizedType));
+    for (const [key, value] of Object.entries(opts.filters || {})) {
+      items = items.filter((item: any) => String(item[key] ?? item.data?.[key] ?? "") === value);
+    }
+    if (opts.cursor) items = items.filter((item: any) => Number(item.id) > Number(opts.cursor));
+    const limit = Math.min(Math.max(opts.limit || 50, 1), 100);
+    const page = items.slice(0, limit);
+    return { items: page, nextCursor: items.length > limit ? String((page.at(-1) as any)?.id || "") : null, total: items.length };
+  }
   const qs = new URLSearchParams();
   if (opts.cursor) qs.set("cursor", opts.cursor);
   if (opts.limit) qs.set("limit", opts.limit.toString());
@@ -149,7 +336,8 @@ export async function listContent(
   const remoteData = await fetchCms<ListResponse<PublishedContent>>(
     `/api/v1/content/${type}${query}`,
     [`cms:${siteKey}:${type}`, `cms:${type}`],
-    siteKey
+    siteKey,
+    false
   );
 
   if (remoteData && Array.isArray(remoteData.items)) {
@@ -168,10 +356,15 @@ export async function getContent(
   type: string = "blog",
   slug: string
 ): Promise<PublishedContent | null> {
+  const normalizedType = publicContentType(type);
+  const tags = [`cms:${siteKey}:${normalizedType}:${slug}`, `cms:${normalizedType}:${slug}`];
+  const artifact = await fetchArtifact(siteKey, type, slug, tags);
+  if (artifact) return artifact;
   return await fetchCms<PublishedContent>(
     `/api/v1/content/${type}/${slug}`,
-    [`cms:${siteKey}:${type}:${slug}`, `cms:${type}:${slug}`],
-    siteKey
+    tags,
+    siteKey,
+    false
   );
 }
 
@@ -188,6 +381,8 @@ export async function getBlogMdx(
 
 export async function getCategories(siteKey?: string): Promise<Category[]> {
   const targetSiteKey = siteKey || getDefaultSiteKey();
+  const publicModel = await fetchPublicModel(targetSiteKey);
+  if (publicModel) return publicModel.categories || [];
   const data = await fetchCms<{ items: Category[] }>(
     `/api/v1/categories?siteKey=${targetSiteKey}`,
     ["cms:categories"],
@@ -198,6 +393,8 @@ export async function getCategories(siteKey?: string): Promise<Category[]> {
 
 export async function getAuthor(slugOrId: string | number, siteKey?: string): Promise<Author | null> {
   const targetSiteKey = siteKey || getDefaultSiteKey();
+  const publicModel = await fetchPublicModel(targetSiteKey);
+  if (publicModel) return publicModel.authors?.find((author) => author.slug === String(slugOrId) || String(author.id) === String(slugOrId)) || null;
   const data = await fetchCms<Author>(
     `/api/v1/authors/${slugOrId}?siteKey=${targetSiteKey}`,
     [`cms:author:${slugOrId}`],
@@ -208,6 +405,8 @@ export async function getAuthor(slugOrId: string | number, siteKey?: string): Pr
 
 export async function getSitemap(siteKey?: string): Promise<SitemapEntry[]> {
   const targetSiteKey = siteKey || getDefaultSiteKey();
+  const publicModel = await fetchPublicModel(targetSiteKey);
+  if (publicModel) return publicModel.sitemap || [];
   try {
     const res = await fetchCmsResponse(`/api/v1/sitemap?siteKey=${targetSiteKey}`, ["cms:sitemap"], targetSiteKey);
     if (!res) return [];
@@ -220,6 +419,8 @@ export async function getSitemap(siteKey?: string): Promise<SitemapEntry[]> {
 
 export async function getSiteConfig(siteKey?: string): Promise<SiteConfig> {
   const targetSiteKey = siteKey || getDefaultSiteKey();
+  const publicModel = await fetchPublicModel(targetSiteKey);
+  if (publicModel?.siteConfig) return sanitizeSiteConfig(publicModel.siteConfig);
   const data = await fetchCms<SiteConfig>(
     `/api/v1/site-config?siteKey=${targetSiteKey}`,
     ["cms:site-config"],
@@ -229,6 +430,8 @@ export async function getSiteConfig(siteKey?: string): Promise<SiteConfig> {
 }
 
 export async function getRedirects(): Promise<RedirectEntry[]> {
+  const publicModel = await fetchPublicModel(getDefaultSiteKey());
+  if (publicModel) return publicModel.redirects || [];
   const data = await fetchCms<{ items: RedirectEntry[] }>("/api/v1/redirects", ["cms:redirects"]);
   return data?.items ?? [];
 }

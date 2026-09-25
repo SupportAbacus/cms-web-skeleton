@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import {
-  ShieldAlert,
   Gauge,
   Activity,
   Lock,
@@ -12,7 +11,6 @@ import {
   CheckCircle2,
   RefreshCw,
   Globe,
-  Sliders,
 } from "lucide-react";
 
 export interface RateLimitTier {

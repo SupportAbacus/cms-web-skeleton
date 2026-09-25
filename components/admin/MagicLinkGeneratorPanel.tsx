@@ -6,11 +6,7 @@ import {
   Copy,
   Check,
   Send,
-  Clock,
   Shield,
-  UserCheck,
-  Trash2,
-  ExternalLink,
   Sparkles,
 } from "lucide-react";
 
